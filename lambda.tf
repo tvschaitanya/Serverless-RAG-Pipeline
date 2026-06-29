@@ -24,15 +24,16 @@ resource "aws_lambda_function" "ingest" {
   memory_size      = 512
 
   environment {
-  variables = {
-    FIRECRAWL_API_KEY = var.firecrawl_api_key
-    WEAVIATE_URL      = var.weaviate_url
-    WEAVIATE_API_KEY  = var.weaviate_api_key
-    TARGET_URL        = var.target_url
-    AWS_REGION_NAME   = var.aws_region
-    CRAWL_LIMIT = tostring(var.crawl_limit)
+    variables = {
+      FIRECRAWL_API_KEY = var.firecrawl_api_key
+      WEAVIATE_URL      = var.weaviate_url
+      WEAVIATE_API_KEY  = var.weaviate_api_key
+      TARGET_URL        = var.target_url
+      AWS_REGION_NAME   = var.aws_region
+      CRAWL_LIMIT       = tostring(var.crawl_limit)
+      COLLECTION_NAME   = var.collection_name
+    }
   }
-}
 }
 
 # Query Lambda
@@ -51,6 +52,7 @@ resource "aws_lambda_function" "query" {
       WEAVIATE_URL     = var.weaviate_url
       WEAVIATE_API_KEY = var.weaviate_api_key
       AWS_REGION_NAME  = var.aws_region
+      COLLECTION_NAME  = var.collection_name
     }
   }
 }

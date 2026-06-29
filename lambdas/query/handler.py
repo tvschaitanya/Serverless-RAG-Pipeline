@@ -4,7 +4,7 @@ import boto3
 import weaviate
 from weaviate.classes.init import Auth
 
-COLLECTION_NAME = "CCIPages"
+COLLECTION_NAME = os.environ["COLLECTION_NAME"]
 
 def get_bedrock():
     return boto3.client("bedrock-runtime", region_name=os.environ["AWS_REGION_NAME"])
@@ -36,7 +36,7 @@ def generate(bedrock, question, chunks):
     context = "\n\n".join([obj.properties["text"] for obj in chunks])
     sources = list(set([obj.properties["source"] for obj in chunks]))
 
-    prompt = f"""You are a helpful assistant for FSU CCI.
+    prompt = f"""You are a helpful assistant.
 Use only the context below to answer the question.
 If the context does not contain enough information, say so clearly.
 

@@ -6,7 +6,7 @@ from weaviate.classes.init import Auth
 from weaviate.classes.config import Property, DataType
 from firecrawl import FirecrawlApp
 
-COLLECTION_NAME = "CCIPages"
+COLLECTION_NAME = os.environ["COLLECTION_NAME"]
 
 def get_bedrock():
     return boto3.client("bedrock-runtime", region_name=os.environ["AWS_REGION_NAME"])
