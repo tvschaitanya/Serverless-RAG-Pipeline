@@ -1,5 +1,3 @@
-Here's the updated README with Langfuse added:
-
 ```markdown
 # Serverless RAG Pipeline
 
@@ -56,7 +54,7 @@ API Gateway → Lambda → Bedrock (Cohere Embed v3) → Weaviate → Bedrock (C
 ├── outputs.tf                # API URL and Lambda name
 ├── iam.tf                    # Lambda role with Bedrock and Marketplace permissions
 ├── lambda.tf                 # ingest and query Lambda functions
-├── apigateway.tf             # HTTP API Gateway with POST /query route
+├── apigateway.tf             # HTTP API Gateway with POST /query route and rate limiting
 ├── terraform.tfvars.example  # template for your secrets
 └── README.md
 ```
@@ -202,6 +200,12 @@ Every query is traced automatically. Go to [cloud.langfuse.com](https://cloud.la
 
 ---
 
+## Rate Limiting
+
+The API Gateway is configured to allow 10 requests per second with a burst limit of 20. Requests exceeding this return a `429 Too Many Requests` response. Adjust `throttling_rate_limit` and `throttling_burst_limit` in `apigateway.tf` to tune for your use case.
+
+---
+
 ## Changing the target site
 
 Update `target_url` and `collection_name` in `terraform.tfvars`, redeploy, then re-run ingestion:
@@ -235,6 +239,7 @@ aws logs tail /aws/lambda/rag-query --follow
 | `AuthenticationFailedException` on Weaviate | Double-check `weaviate_url` and `weaviate_api_key` in tfvars |
 | `Invalid JSON` from query API | Ensure `Content-Type: application/json` header is set |
 | `500 Internal Server Error` | Check query Lambda logs — almost always a Bedrock or Weaviate config issue |
+| `429 Too Many Requests` | Rate limit hit — back off and retry |
 | Traces not appearing in Langfuse | Check `langfuse_host` — use `https://us.cloud.langfuse.com` for US region projects |
 
 ---
@@ -273,4 +278,5 @@ Removes all AWS resources. Your Weaviate, Firecrawl, and Langfuse accounts are u
 - Re-running ingestion wipes and rebuilds the Weaviate collection — existing data is replaced
 - `collection_name` must be PascalCase with no special characters — Weaviate enforces this
 - Langfuse SDK must be pinned to v2 (`langfuse>=2.0.0,<3.0.0`) — v3 uses a different API
+- Context sent to Bedrock is capped at 3 chunks and 3000 characters to control input token costs
 ```
