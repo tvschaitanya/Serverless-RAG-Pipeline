@@ -1,7 +1,7 @@
 ```markdown
 # Serverless RAG Pipeline
 
-A production-ready retrieval-augmented generation (RAG) pipeline on AWS serverless infrastructure. Point it at any website, it crawls and indexes the content, and exposes a REST API that answers natural language questions about it with source citations.
+A fully serverless retrieval-augmented generation (RAG) pipeline on AWS. Point it at any website, it crawls and indexes the content, and exposes a REST API that answers natural language questions about it with source citations.
 
 ---
 
@@ -52,7 +52,7 @@ API Gateway → Lambda → Bedrock (Cohere Embed v3) → Weaviate → Bedrock (C
 ├── iam.tf                    # Lambda role with Bedrock and Marketplace permissions
 ├── lambda.tf                 # ingest and query Lambda functions
 ├── apigateway.tf             # HTTP API Gateway with POST /query route
-├── terraform.tfvars.example  # template for secrets
+├── terraform.tfvars.example  # template for your secrets
 └── README.md
 ```
 
@@ -60,7 +60,7 @@ API Gateway → Lambda → Bedrock (Cohere Embed v3) → Weaviate → Bedrock (C
 
 ## Prerequisites
 
-Before you start, you need:
+Before you start you need:
 
 - **AWS account** with an IAM user (not root) that has admin access
 - **AWS CLI** installed and configured (`aws configure`)
@@ -112,9 +112,13 @@ weaviate_url      = "your-weaviate-cluster-url"
 weaviate_api_key  = "your-weaviate-api-key"
 target_url        = "https://yoursite.com/"
 crawl_limit       = 10
+collection_name   = "YourSitePages"
 ```
 
-`terraform.tfvars` is gitignored — never commit it.
+**Notes:**
+- `terraform.tfvars` is gitignored — never commit it
+- `collection_name` must start with an uppercase letter and contain only letters and numbers — no hyphens or underscores (e.g. `Mysite` not `my-site`)
+- `crawl_limit` controls how many pages Firecrawl fetches — start with 10 and increase once everything works
 
 ### 4. Enable Cohere model access on Bedrock
 
@@ -145,7 +149,7 @@ terraform apply -auto-approve
 Terraform will output the API URL when done:
 
 ```
-query_api_url = "https://xxxx.execute-api.us-east-1.amazonaws.com/query"
+query_api_url      = "https://xxxx.execute-api.us-east-1.amazonaws.com/query"
 ingest_lambda_name = "rag-ingest"
 ```
 
@@ -154,15 +158,11 @@ ingest_lambda_name = "rag-ingest"
 This crawls your target URL and loads everything into Weaviate. Run it once after deploy, and re-run any time you want to refresh the data.
 
 ```bash
-aws lambda invoke \
-  --function-name rag-ingest \
-  --log-type Tail \
-  output.json \
-  --query 'LogResult' \
-  --output text | base64 -d
+aws lambda invoke --function-name rag-ingest --log-type Tail output.json \
+  --query 'LogResult' --output text | base64 -d
 ```
 
-You'll see logs showing pages crawled and chunks stored. The ingest Lambda wipes and rebuilds the collection on every run, so re-running is safe and idempotent.
+You'll see logs showing pages crawled and chunks stored. Re-running ingestion is safe — it wipes and rebuilds the collection every time.
 
 ### 7. Query
 
@@ -186,6 +186,18 @@ Response:
 
 ---
 
+## Changing the target site
+
+Update `target_url` and `collection_name` in `terraform.tfvars`, redeploy, then re-run ingestion:
+
+```bash
+terraform apply -auto-approve
+aws lambda invoke --function-name rag-ingest --log-type Tail output.json \
+  --query 'LogResult' --output text | base64 -d
+```
+
+---
+
 ## Debugging
 
 Check Lambda logs in real time:
@@ -195,14 +207,6 @@ aws logs tail /aws/lambda/rag-ingest --follow
 aws logs tail /aws/lambda/rag-query --follow
 ```
 
-Common issues:
-
-| Error | Fix |
-|---|---|
-| `ResourceNotFoundException` on Bedrock | Enable the model in AWS Bedrock console under Model Access |
-| `AuthenticationFailedException` on Weaviate | Double-check `weaviate_url` and `weaviate_api_key` in tfvars |
-| `Task timed out` on ingest | Increase `crawl_limit` gradually or check Firecrawl API key |
-| `Invalid JSON` from query API | Ensure `Content-Type: application/json` header is set |
 
 ---
 
@@ -215,6 +219,19 @@ terraform apply -auto-approve
 aws lambda invoke --function-name rag-ingest --log-type Tail output.json \
   --query 'LogResult' --output text | base64 -d
 ```
+
+---
+
+Common issues:
+
+| Error | Fix |
+|---|---|
+| `could not find class X in schema` | Ingestion hasn't run yet, or `collection_name` changed — re-run ingest |
+| `expected maxLength: 2048` | Chunks are too long — reduce `chunk_size` in `lambdas/ingest/handler.py` to 70 |
+| `ResourceNotFoundException` on Bedrock | Enable the model in AWS Bedrock console under Model Access |
+| `AuthenticationFailedException` on Weaviate | Double-check `weaviate_url` and `weaviate_api_key` in tfvars |
+| `Invalid JSON` from query API | Ensure `Content-Type: application/json` header is set |
+| `500 Internal Server Error` | Check query Lambda logs — almost always a Bedrock or Weaviate config issue |
 
 ---
 
@@ -242,11 +259,12 @@ Removes all AWS resources. Your Weaviate and Firecrawl accounts are unaffected a
 
 ---
 
-## Notes
+## Important notes
 
 - Lambda dependencies must target Linux x86_64 regardless of your local OS
 - Cohere Embed requires a one-time AWS Marketplace agreement per AWS account
 - Claude Haiku must be invoked using the `us.` inference profile prefix for cross-region routing
-- The Weaviate client must be instantiated inside the Lambda handler, not at module level — stale connections will cause failures on warm invocations
+- The Weaviate client is instantiated inside the Lambda handler, not at module level — this is intentional to avoid stale connections on warm invocations
 - Re-running ingestion wipes and rebuilds the Weaviate collection — existing data is replaced
+- `collection_name` must be PascalCase with no special characters — Weaviate enforces this
 ```
