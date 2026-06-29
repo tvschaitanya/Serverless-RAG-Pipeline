@@ -1,3 +1,5 @@
+Here's the updated README with Langfuse added:
+
 ```markdown
 # Serverless RAG Pipeline
 
@@ -9,7 +11,7 @@ A fully serverless retrieval-augmented generation (RAG) pipeline on AWS. Point i
 
 **Ingestion** — crawls a target URL, chunks the content, embeds it with Cohere, and stores vectors in Weaviate.
 
-**Query** — takes a natural language question, embeds it, retrieves the most relevant chunks from Weaviate, and generates an answer with Claude Haiku via Bedrock.
+**Query** — takes a natural language question, embeds it, retrieves the most relevant chunks from Weaviate, and generates an answer with Claude Haiku via Bedrock. Every request is traced in Langfuse.
 
 ```
 Ingestion:
@@ -17,6 +19,8 @@ Firecrawl → Lambda → Bedrock (Cohere Embed v3) → Weaviate Cloud
 
 Query:
 API Gateway → Lambda → Bedrock (Cohere Embed v3) → Weaviate → Bedrock (Claude Haiku) → JSON response
+                                                                                      ↓
+                                                                                  Langfuse
 ```
 
 ---
@@ -31,6 +35,7 @@ API Gateway → Lambda → Bedrock (Cohere Embed v3) → Weaviate → Bedrock (C
 | LLM | AWS Bedrock — Claude Haiku 4.5 |
 | Compute | AWS Lambda (Python 3.12) |
 | API | AWS API Gateway HTTP API |
+| Observability | Langfuse |
 | IaC | Terraform |
 
 ---
@@ -44,7 +49,7 @@ API Gateway → Lambda → Bedrock (Cohere Embed v3) → Weaviate → Bedrock (C
 │   │   ├── handler.py        # crawl, chunk, embed, store
 │   │   └── requirements.txt
 │   └── query/
-│       ├── handler.py        # embed query, retrieve, generate
+│       ├── handler.py        # embed query, retrieve, generate, trace
 │       └── requirements.txt
 ├── main.tf                   # provider and region
 ├── variables.tf              # all input variables
@@ -69,6 +74,7 @@ Before you start you need:
 - **uv** package manager (`pip install uv`)
 - **Firecrawl account** — [firecrawl.dev](https://firecrawl.dev) (free tier works)
 - **Weaviate Cloud account** — [console.weaviate.cloud](https://console.weaviate.cloud) (free tier works)
+- **Langfuse account** — [cloud.langfuse.com](https://cloud.langfuse.com) (free tier works)
 
 ---
 
@@ -113,12 +119,18 @@ weaviate_api_key  = "your-weaviate-api-key"
 target_url        = "https://yoursite.com/"
 crawl_limit       = 10
 collection_name   = "YourSitePages"
+
+# Langfuse
+langfuse_public_key = "pk-lf-..."
+langfuse_secret_key = "sk-lf-..."
+langfuse_host       = "https://cloud.langfuse.com"  # or https://us.cloud.langfuse.com for US region
 ```
 
 **Notes:**
 - `terraform.tfvars` is gitignored — never commit it
 - `collection_name` must start with an uppercase letter and contain only letters and numbers — no hyphens or underscores (e.g. `Mysite` not `my-site`)
 - `crawl_limit` controls how many pages Firecrawl fetches — start with 10 and increase once everything works
+- For Langfuse, use `https://us.cloud.langfuse.com` if your project is in the US region, otherwise `https://cloud.langfuse.com`
 
 ### 4. Enable Cohere model access on Bedrock
 
@@ -184,6 +196,10 @@ Response:
 }
 ```
 
+### 8. View traces in Langfuse
+
+Every query is traced automatically. Go to [cloud.langfuse.com](https://cloud.langfuse.com) → your project → **Tracing** to see each request with its input question, answer, and sources.
+
 ---
 
 ## Changing the target site
@@ -207,22 +223,9 @@ aws logs tail /aws/lambda/rag-ingest --follow
 aws logs tail /aws/lambda/rag-query --follow
 ```
 
-
 ---
 
-## Changing the target site
-
-Update `target_url` (and optionally `crawl_limit`) in `terraform.tfvars`, redeploy, then re-run ingestion:
-
-```bash
-terraform apply -auto-approve
-aws lambda invoke --function-name rag-ingest --log-type Tail output.json \
-  --query 'LogResult' --output text | base64 -d
-```
-
----
-
-Common issues:
+## Common issues
 
 | Error | Fix |
 |---|---|
@@ -232,6 +235,7 @@ Common issues:
 | `AuthenticationFailedException` on Weaviate | Double-check `weaviate_url` and `weaviate_api_key` in tfvars |
 | `Invalid JSON` from query API | Ensure `Content-Type: application/json` header is set |
 | `500 Internal Server Error` | Check query Lambda logs — almost always a Bedrock or Weaviate config issue |
+| Traces not appearing in Langfuse | Check `langfuse_host` — use `https://us.cloud.langfuse.com` for US region projects |
 
 ---
 
@@ -245,6 +249,7 @@ Fully serverless — you pay per invocation, not uptime.
 | API Gateway | ~$0.002 |
 | Bedrock (Cohere + Haiku) | ~$0.20 |
 | Weaviate Cloud | $0 (free tier) |
+| Langfuse | $0 (free tier) |
 | **Total** | **under $0.25/month** |
 
 ---
@@ -255,7 +260,7 @@ Fully serverless — you pay per invocation, not uptime.
 terraform destroy -auto-approve
 ```
 
-Removes all AWS resources. Your Weaviate and Firecrawl accounts are unaffected and must be managed separately.
+Removes all AWS resources. Your Weaviate, Firecrawl, and Langfuse accounts are unaffected and must be managed separately.
 
 ---
 
@@ -267,4 +272,5 @@ Removes all AWS resources. Your Weaviate and Firecrawl accounts are unaffected a
 - The Weaviate client is instantiated inside the Lambda handler, not at module level — this is intentional to avoid stale connections on warm invocations
 - Re-running ingestion wipes and rebuilds the Weaviate collection — existing data is replaced
 - `collection_name` must be PascalCase with no special characters — Weaviate enforces this
+- Langfuse SDK must be pinned to v2 (`langfuse>=2.0.0,<3.0.0`) — v3 uses a different API
 ```
