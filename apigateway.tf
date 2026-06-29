@@ -25,11 +25,16 @@ resource "aws_apigatewayv2_route" "query_route" {
   target    = "integrations/${aws_apigatewayv2_integration.query_integration.id}"
 }
 
-# Auto deploy stage
+# Auto deploy stage with rate limiting
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.query_api.id
   name        = "$default"
   auto_deploy = true
+
+  default_route_settings {
+    throttling_rate_limit  = 10
+    throttling_burst_limit = 20
+  }
 }
 
 # Allow API Gateway to invoke query Lambda

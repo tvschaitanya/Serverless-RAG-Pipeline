@@ -18,7 +18,7 @@ def embed_query(bedrock, text):
             "input_type": "search_query"
         })
     )
-    return json.loads(response["body"].read())["embeddings"][0]  # Fixed: was missing [0]
+    return json.loads(response["body"].read())["embeddings"][0]
 
 def retrieve(client, bedrock, question):
     vector = embed_query(bedrock, question)
@@ -34,12 +34,21 @@ def generate(bedrock, question, chunks):
     if not chunks:
         return "I don't have enough information to answer that question.", []
 
+    # Cap to 3 chunks to limit input tokens
+    chunks = chunks[:3]
+
     context = "\n\n".join([obj.properties["text"] for obj in chunks])
+
+    # Truncate context to cap input tokens
+    if len(context) > 3000:
+        context = context[:3000]
+
     sources = list(set([obj.properties["source"] for obj in chunks]))
 
     prompt = f"""You are a helpful assistant.
 Use only the context below to answer the question.
 If the context does not contain enough information, say so clearly.
+Keep your answer concise.
 
 Context:
 {context}
@@ -52,11 +61,12 @@ Answer:"""
         body=json.dumps({
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 512,
+            "temperature": 0,
             "messages": [{"role": "user", "content": prompt}]
         })
     )
     body = json.loads(response["body"].read())
-    return body["content"][0]["text"], sources  # Fixed: was body["content"]["text"]
+    return body["content"][0]["text"], sources
 
 def lambda_handler(event, context):
     client = None
