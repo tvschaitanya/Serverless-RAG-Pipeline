@@ -1,7 +1,7 @@
 # secrets
 terraform.tfvars
 
-#MacOS
+# MacOS
 .DS_Store
 
 # terraform artifacts
@@ -10,6 +10,7 @@ terraform.tfvars
 .terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
+output.json
 
 # lambda dependencies (installed packages)
 lambdas/ingest/**

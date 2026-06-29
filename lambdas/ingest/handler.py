@@ -11,7 +11,7 @@ COLLECTION_NAME = os.environ["COLLECTION_NAME"]
 def get_bedrock():
     return boto3.client("bedrock-runtime", region_name=os.environ["AWS_REGION_NAME"])
 
-def chunk_text(text, chunk_size=150, overlap=15):
+def chunk_text(text, chunk_size=100, overlap=10):
     words = text.split()
     chunks = []
     i = 0
