@@ -1,0 +1,6 @@
+aws_region        = "us-east-1"
+firecrawl_api_key = "your-firecrawl-api-key"
+weaviate_url      = "your-weaviate-cluster-url"
+weaviate_api_key  = "your-weaviate-api-key"
+target_url        = "example.com"
+crawl_limit       = "10"

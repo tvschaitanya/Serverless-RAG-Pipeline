@@ -1,0 +1,20 @@
+# secrets
+terraform.tfvars
+
+#MacOS
+.DS_Store
+
+# terraform artifacts
+*.zip
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+
+# lambda dependencies (installed packages)
+lambdas/ingest/**
+lambdas/query/**
+!lambdas/ingest/handler.py
+!lambdas/ingest/requirements.txt
+!lambdas/query/handler.py
+!lambdas/query/requirements.txt
