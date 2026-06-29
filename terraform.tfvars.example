@@ -5,3 +5,8 @@ weaviate_api_key  = "your-weaviate-api-key"
 target_url        = "https://yoursite.com/"
 crawl_limit       = 10
 collection_name   = "YourSitePages"
+
+# Langfuse Configuration
+langfuse_public_key = "pk-lf-your-public-key"
+langfuse_secret_key = "sk-lf-your-secret-key"
+langfuse_host       = "https://cloud.langfuse.com" # Use https://us.cloud.langfuse.com if your project is hosted in the US region

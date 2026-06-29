@@ -38,3 +38,22 @@ variable "collection_name" {
   type        = string
   default     = "WebPages"
 }
+
+# --- Langfuse Variables ---
+
+variable "langfuse_public_key" {
+  description = "Langfuse Public API Key"
+  type        = string
+}
+
+variable "langfuse_secret_key" {
+  description = "Langfuse Secret API Key"
+  type        = string
+  sensitive   = true
+}
+
+variable "langfuse_host" {
+  description = "Langfuse Host URL"
+  type        = string
+  default     = "https://cloud.langfuse.com"
+}

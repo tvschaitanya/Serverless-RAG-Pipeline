@@ -49,10 +49,15 @@ resource "aws_lambda_function" "query" {
 
   environment {
     variables = {
-      WEAVIATE_URL     = var.weaviate_url
-      WEAVIATE_API_KEY = var.weaviate_api_key
-      AWS_REGION_NAME  = var.aws_region
-      COLLECTION_NAME  = var.collection_name
+      WEAVIATE_URL        = var.weaviate_url
+      WEAVIATE_API_KEY    = var.weaviate_api_key
+      AWS_REGION_NAME     = var.aws_region
+      COLLECTION_NAME     = var.collection_name
+      
+      # Langfuse Automatic SDK Configuration
+      LANGFUSE_PUBLIC_KEY = var.langfuse_public_key
+      LANGFUSE_SECRET_KEY = var.langfuse_secret_key
+      LANGFUSE_HOST       = var.langfuse_host
     }
   }
 }

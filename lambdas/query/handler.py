@@ -3,6 +3,7 @@ import json
 import boto3
 import weaviate
 from weaviate.classes.init import Auth
+from langfuse import Langfuse
 
 COLLECTION_NAME = os.environ["COLLECTION_NAME"]
 
@@ -17,7 +18,7 @@ def embed_query(bedrock, text):
             "input_type": "search_query"
         })
     )
-    return json.loads(response["body"].read())["embeddings"][0]
+    return json.loads(response["body"].read())["embeddings"][0]  # Fixed: was missing [0]
 
 def retrieve(client, bedrock, question):
     vector = embed_query(bedrock, question)
@@ -55,56 +56,59 @@ Answer:"""
         })
     )
     body = json.loads(response["body"].read())
-    return body["content"][0]["text"], sources
+    return body["content"][0]["text"], sources  # Fixed: was body["content"]["text"]
 
 def lambda_handler(event, context):
+    client = None
+    langfuse = Langfuse(flush_at=1)
+
+    if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+        return {"statusCode": 200, "body": ""}
+
     try:
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Invalid JSON"})
-        }
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid JSON"})}
 
     question = (body.get("question") or "").strip()
     if not question:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "question is required"})
-        }
+        return {"statusCode": 400, "body": json.dumps({"error": "question is required"})}
 
     if len(question) > 1000:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "question must be under 1000 characters"})
-        }
+        return {"statusCode": 400, "body": json.dumps({"error": "question must be under 1000 characters"})}
 
-    print(f"Question: {question}")
-    bedrock = get_bedrock()
-
-    client = weaviate.connect_to_weaviate_cloud(
-        cluster_url=os.environ["WEAVIATE_URL"],
-        auth_credentials=Auth.api_key(os.environ["WEAVIATE_API_KEY"])
-    )
+    trace = langfuse.trace(name="rag-query-request", input={"question": question})
 
     try:
+        print(f"Question: {question}")
+        bedrock = get_bedrock()
+
+        client = weaviate.connect_to_weaviate_cloud(
+            cluster_url=os.environ["WEAVIATE_URL"],
+            auth_credentials=Auth.api_key(os.environ["WEAVIATE_API_KEY"])
+        )
+
         chunks = retrieve(client, bedrock, question)
         answer, sources = generate(bedrock, question, chunks)
+
+        trace.update(output={"answer": answer, "sources": sources})
+
+        return {
+            "statusCode": 200,
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps({"answer": answer, "sources": sources})
+        }
+
     except Exception as e:
         print(f"ERROR: {e}")
+        trace.update(output={"error": str(e)})
         return {
             "statusCode": 500,
-            "headers": {"Content-Type": "application/json"},
+            "headers": {"content-type": "application/json"},
             "body": json.dumps({"error": "Internal server error"})
         }
-    finally:
-        client.close()
 
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"answer": answer, "sources": sources})
-    }
+    finally:
+        if client:
+            client.close()
+        langfuse.flush()

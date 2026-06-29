@@ -3,10 +3,10 @@ resource "aws_apigatewayv2_api" "query_api" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["*"]
+    allow_origins = ["https://rag-chat-ui.pages.dev", "http://localhost:3000"]
     allow_methods = ["POST", "OPTIONS"]
-    allow_headers = ["Content-Type"]
-    max_age       = 300
+    allow_headers = ["content-type", "authorization", "*"]
+    max_age       = 3600
   }
 }
 
