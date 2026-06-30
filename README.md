@@ -1,4 +1,3 @@
-```markdown
 # Serverless RAG Pipeline
 
 A fully serverless retrieval-augmented generation (RAG) pipeline on AWS. Point it at any website, it crawls and indexes the content, and exposes a REST API that answers natural language questions about it with source citations.
@@ -279,4 +278,3 @@ Removes all AWS resources. Your Weaviate, Firecrawl, and Langfuse accounts are u
 - `collection_name` must be PascalCase with no special characters — Weaviate enforces this
 - Langfuse SDK must be pinned to v2 (`langfuse>=2.0.0,<3.0.0`) — v3 uses a different API
 - Context sent to Bedrock is capped at 3 chunks and 3000 characters to control input token costs
-```
